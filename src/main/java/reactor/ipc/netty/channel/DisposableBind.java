@@ -122,16 +122,16 @@ final class DisposableBind
 
 	@Override
 	public void onReceiveError(Channel channel, Throwable error) {
-		log.error("onConnectionReceiveError({})", channel);
+		log.error("onConnectionReceiveError({}, {})", channel, error);
 		onDispose(channel);
 	}
 
 	@Override
-	public void onSetup(Channel channel, @Nullable Object msg) {
+	public void onSetup(Channel channel, @Nullable Object msg,  @Nullable Integer streamId) {
 		if (opsFactory.createOnConnected() || msg != null) {
 			log.debug("onConnectionSetup({})", channel);
 
-			ChannelOperations<?, ?> ops = opsFactory.create(() -> channel, this, msg);
+			ChannelOperations<?, ?> ops = opsFactory.create(() -> channel, this, msg, streamId);
 
 			channel.attr(OPERATIONS_KEY)
 			       .set(ops);

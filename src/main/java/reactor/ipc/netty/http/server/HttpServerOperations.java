@@ -106,15 +106,20 @@ class HttpServerOperations extends HttpOperations<HttpServerRequest, HttpServerR
 			HttpRequest nettyRequest,
 			boolean forwarded) {
 		super(c, listener);
-		this.nettyRequest = Objects.requireNonNull(nettyRequest, "nettyRequest");
+		this.nettyRequest = nettyRequest;//Objects.requireNonNull(nettyRequest, "nettyRequest");
 		this.nettyResponse = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
 		this.responseHeaders = nettyResponse.headers();
-		this.cookieHolder = Cookies.newServerRequestHolder(requestHeaders());
-		if (forwarded) {
-			this.connectionInfo = ConnectionInfo.newForwardedConnectionInfo(this, (SocketChannel) channel());
+		if (nettyRequest != null) {
+			this.cookieHolder = Cookies.newServerRequestHolder(requestHeaders());
+			if (forwarded) {
+				this.connectionInfo = ConnectionInfo.newForwardedConnectionInfo(this, (SocketChannel) channel());
+			} else {
+				this.connectionInfo = ConnectionInfo.newConnectionInfo(this, (SocketChannel) channel());
+			}
 		}
 		else {
-			this.connectionInfo = ConnectionInfo.newConnectionInfo(this, (SocketChannel) channel());
+			this.cookieHolder = null;
+			this.connectionInfo = null;
 		}
 		chunkedTransfer(true);
 	}

@@ -436,7 +436,7 @@ public class ChannelOperations<INBOUND extends NettyInbound, OUTBOUND extends Ne
 		 * @return a new {@link ChannelOperations}
 		 */
 		ChannelOperations<?, ?> create(Connection c, ConnectionEvents listener,
-				@Nullable  Object msg);
+				@Nullable Object msg, @Nullable Integer streamId);
 
 		/**
 		 * True if {@link ChannelOperations} should be created by {@link

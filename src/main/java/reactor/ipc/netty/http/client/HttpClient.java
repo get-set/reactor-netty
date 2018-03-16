@@ -538,7 +538,7 @@ public abstract class HttpClient {
 
 
 	static final ChannelOperations.OnSetup HTTP_OPS =
-			(ch, c, msg) -> HttpClientOperations.bindHttp(ch, c);
+			(ch, c, msg, streamId) -> HttpClientOperations.bindHttp(ch, c);
 
 	static final Function<Bootstrap, Bootstrap> HTTP_OPS_CONF = b -> {
 		BootstrapHandlers.channelOperationFactory(b, HTTP_OPS);

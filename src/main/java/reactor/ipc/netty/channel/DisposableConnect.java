@@ -112,10 +112,10 @@ final class DisposableConnect
 	}
 
 	@Override
-	public void onSetup(Channel channel, @Nullable Object msg) {
+	public void onSetup(Channel channel, @Nullable Object msg,  @Nullable Integer streamId) {
 		this.channel = channel;
 		log.debug("onConnectionSetup({})", channel);
-		ChannelOperations<?, ?> ops = opsFactory.create(this, this, msg);
+		ChannelOperations<?, ?> ops = opsFactory.create(this, this, msg, streamId);
 
 		channel.attr(OPERATIONS_KEY)
 		       .set(ops);

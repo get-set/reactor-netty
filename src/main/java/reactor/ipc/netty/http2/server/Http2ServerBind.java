@@ -13,15 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package reactor.ipc.netty.http.server;
+package reactor.ipc.netty.http2.server;
 
 import java.util.Objects;
 import java.util.function.Function;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
-import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.ssl.ApplicationProtocolNames;
+import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.JdkSslContext;
 import io.netty.util.AttributeKey;
 import reactor.core.publisher.Mono;
@@ -34,32 +36,20 @@ import reactor.ipc.netty.resources.LoopResources;
 import reactor.ipc.netty.tcp.TcpServer;
 import reactor.util.annotation.Nullable;
 
-import static reactor.ipc.netty.http.server.HttpRequestDecoderConfiguration.DEFAULT_INITIAL_BUFFER_SIZE;
-import static reactor.ipc.netty.http.server.HttpRequestDecoderConfiguration.DEFAULT_MAX_CHUNK_SIZE;
-import static reactor.ipc.netty.http.server.HttpRequestDecoderConfiguration.DEFAULT_MAX_HEADER_SIZE;
-import static reactor.ipc.netty.http.server.HttpRequestDecoderConfiguration.DEFAULT_MAX_INITIAL_LINE_LENGTH;
-import static reactor.ipc.netty.http.server.HttpRequestDecoderConfiguration.DEFAULT_VALIDATE_HEADERS;
-import static reactor.ipc.netty.http.server.HttpRequestDecoderConfiguration.INITIAL_BUFFER_SIZE;
-import static reactor.ipc.netty.http.server.HttpRequestDecoderConfiguration.MAX_CHUNK_SIZE;
-import static reactor.ipc.netty.http.server.HttpRequestDecoderConfiguration.MAX_HEADER_SIZE;
-import static reactor.ipc.netty.http.server.HttpRequestDecoderConfiguration.MAX_INITIAL_LINE_LENGTH;
-import static reactor.ipc.netty.http.server.HttpRequestDecoderConfiguration.VALIDATE_HEADERS;
-
 /**
- * @author Stephane Maldini
  * @author Violeta Georgieva
  */
-final class HttpServerBind extends HttpServer implements Function<ServerBootstrap, ServerBootstrap> {
+final class Http2ServerBind extends Http2Server implements Function<ServerBootstrap, ServerBootstrap> {
 
-	static final HttpServerBind INSTANCE = new HttpServerBind();
+	static final Http2ServerBind INSTANCE = new Http2ServerBind();
 
 	final TcpServer tcpServer;
 
-	HttpServerBind() {
+	Http2ServerBind() {
 		this(DEFAULT_TCP_SERVER);
 	}
 
-	HttpServerBind(TcpServer tcpServer) {
+	Http2ServerBind(TcpServer tcpServer) {
 		this.tcpServer = Objects.requireNonNull(tcpServer, "tcpServer");
 	}
 
@@ -91,40 +81,19 @@ final class HttpServerBind extends HttpServer implements Function<ServerBootstra
 			 .channel(loops.onServerChannel(elg));
 		}
 
-		Integer minCompressionSize = getAttributeValue(b, PRODUCE_GZIP, null);
-
-		Integer line = getAttributeValue(b, MAX_INITIAL_LINE_LENGTH, DEFAULT_MAX_INITIAL_LINE_LENGTH);
-
-		Integer header = getAttributeValue(b, MAX_HEADER_SIZE, DEFAULT_MAX_HEADER_SIZE);
-
-		Integer chunk = getAttributeValue(b, MAX_CHUNK_SIZE, DEFAULT_MAX_CHUNK_SIZE);
-
-		Boolean validate = getAttributeValue(b, VALIDATE_HEADERS, DEFAULT_VALIDATE_HEADERS);
-
-		Integer buffer = getAttributeValue(b, INITIAL_BUFFER_SIZE, DEFAULT_INITIAL_BUFFER_SIZE);
-
 		BootstrapHandlers.updateConfiguration(b,
 				NettyPipeline.HttpInitializer,
 				(listener, channel) -> {
-					configurePipelineForHttp11(minCompressionSize, line, header, chunk, validate,
-					        buffer, listener, channel.pipeline());
+					ChannelPipeline p = channel.pipeline();
+					if (p.get(NettyPipeline.SslHandler) != null) {
+						p.addLast(new Http2OrHttpHandler(listener));
+					}
+					else {
+						// TODO configure clear text
+					}
 				});
 		return b;
 	}
-
-	private static void configurePipelineForHttp11(Integer minCompressionSize, Integer line, Integer header, Integer chunk,
-			Boolean validate, Integer buffer, ConnectionEvents listener, ChannelPipeline p) {
-		p.addLast(NettyPipeline.HttpCodec, new HttpServerCodec(line, header, chunk, validate, buffer));
-
-		if (minCompressionSize != null && minCompressionSize >= 0) {
-			p.addLast(NettyPipeline.CompressionHandler, new CompressionHandler(minCompressionSize));
-		}
-
-		p.addLast(NettyPipeline.HttpServerHandler, new HttpServerHandler(listener));
-	}
-
-	static final AttributeKey<Integer> PRODUCE_GZIP =
-			AttributeKey.newInstance("produceGzip");
 
 	@SuppressWarnings("unchecked")
 	@Nullable
@@ -135,5 +104,25 @@ final class HttpServerBind extends HttpServer implements Function<ServerBootstra
 				: defaultValue;
 		bootstrap.attr(attributeKey, null);
 		return result;
+	}
+
+	static final class Http2OrHttpHandler extends ApplicationProtocolNegotiationHandler {
+		final ConnectionEvents listener;
+
+		Http2OrHttpHandler(ConnectionEvents listener) {
+			super(ApplicationProtocolNames.HTTP_2);
+			this.listener = listener;
+		}
+
+		@Override
+		protected void configurePipeline(ChannelHandlerContext ctx, String protocol) throws Exception {
+			if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
+				ctx.pipeline().addBefore(NettyPipeline.ReactiveBridge,
+				        NettyPipeline.HttpServerHandler, new Http2ServerHandlerBuilder(ctx, listener).build());
+				return;
+			}
+
+			throw new IllegalStateException("unknown protocol: " + protocol);
+		}
 	}
 }

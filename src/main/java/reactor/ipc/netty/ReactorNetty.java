@@ -408,7 +408,7 @@ final class ReactorNetty {
 		}
 
 		@Override
-		public void onSetup(Channel channel, @Nullable Object msg) {
+		public void onSetup(Channel channel, @Nullable Object msg, @Nullable Integer streamId) {
 
 		}
 	};

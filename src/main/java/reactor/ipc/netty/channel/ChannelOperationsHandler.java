@@ -52,6 +52,7 @@ import reactor.core.publisher.Operators;
 import reactor.ipc.netty.ConnectionEvents;
 import reactor.ipc.netty.NettyOutbound;
 import reactor.ipc.netty.NettyPipeline;
+import reactor.ipc.netty.http2.server.Http2ServerHandler;
 import reactor.util.Logger;
 import reactor.util.Loggers;
 import reactor.util.concurrent.Queues;
@@ -295,10 +296,17 @@ final class ChannelOperationsHandler extends ChannelDuplexHandler
 			if (log.isTraceEnabled()) {
 				log.trace("{} Pending write size = {}", ctx.channel(), pendingBytes);
 			}
-			ChannelFuture future = ctx.write(msg, promise);
-			if (!ctx.channel().isWritable()) {
-				pendingBytes = 0L;
-				ctx.flush();
+			ChannelFuture future;
+			Http2ServerHandler http2ServerHandler = ctx.channel().pipeline().get(Http2ServerHandler.class);
+			if (http2ServerHandler == null) {
+				future = ctx.write(msg, promise);
+				if (!ctx.channel().isWritable()) {
+					pendingBytes = 0L;
+					ctx.flush();
+				}
+			}
+			else {
+				future = http2ServerHandler.encoder().writeData(ctx, 1, (ByteBuf) msg, 0, true, ctx.newPromise());
 			}
 			return future;
 		}

@@ -133,9 +133,9 @@ final class DisposableAcquire implements Connection, ConnectionEvents,
 	}
 
 	@Override
-	public void onSetup(Channel channel, @Nullable Object msg) {
+	public void onSetup(Channel channel, @Nullable Object msg,  @Nullable Integer streamId) {
 		log.debug("onConnectionSetup({})", channel);
-		ChannelOperations<?, ?> ops = opsFactory.create(this, this, msg);
+		ChannelOperations<?, ?> ops = opsFactory.create(this, this, msg, streamId);
 
 		channel.attr(OPERATIONS_KEY)
 		       .set(ops);

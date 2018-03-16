@@ -76,5 +76,17 @@ public interface ConnectionEvents {
 	 * @param channel the remote channel
 	 * @param msg an optional initial decoded message
 	 */
-	void onSetup(Channel channel, @Nullable Object msg);
+	default void onSetup(Channel channel, @Nullable Object msg) {
+		onSetup(channel, msg, null);
+	}
+
+	/**
+	 * React on remote channel connection setup eventually given an initial packet (e.g.
+	 * {@link io.netty.handler.codec.http2.Http2Headers} for http2 servers).
+	 *
+	 * @param channel the remote channel
+	 * @param msg an optional initial decoded message
+	 * @param streamId the stream ID
+	 */
+	void onSetup(Channel channel, @Nullable Object msg, @Nullable Integer streamId);
 }
